@@ -1,0 +1,120 @@
+﻿@model List<GitHubTask.Models.GitHub>
+
+<div>
+    <table class="table table-striped table-bordered" id="repoTable">
+        <thead>
+            <tr>
+                <th data-sort="name" style="cursor:pointer;">Name ⬍</th>
+                <th>Description</th>
+                <th data-sort="stars" style="cursor:pointer;">Stars ⭐ ⬍</th>
+                <th>User</th>
+            </tr>
+        </thead>
+        <tbody id="repoBody">
+            @Html.Partial("PartialList", Model)
+        </tbody>
+    </table>
+</div>
+
+<div id="loading" style="display:none; text-align:center; margin:20px;">Loading...</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            let minPageLoaded = 1;
+            let maxPageLoaded = 1;
+            let isLoading = false;
+            const preloadOffset = 150;
+            let loadedPages = new Set([1]); 
+            let currentSort = { column: null, order: 'asc' }; 
+
+            function loadPage(page, direction) {
+                if (isLoading || page < 1) return;
+
+                let pageKey = page + "_" + (currentSort.column || "default") + "_" + currentSort.order;
+                if (loadedPages.has(pageKey)) return;
+
+                loadedPages.add(pageKey);
+                isLoading = true;
+                $("#loading").show();
+
+                $.get("/Home/LoadMore", { page: page }, function (data) {
+                    if (data && data.trim().length > 0) {
+                        if (direction === "down") {
+                            $("#repoBody").append(data);
+                            maxPageLoaded = Math.max(maxPageLoaded, page);
+                        } else {
+                            let scrollTop = $(window).scrollTop();
+                            $("#repoBody").prepend(data);
+                            minPageLoaded = Math.min(minPageLoaded, page);
+
+                            let newScrollHeight = $(document).height();
+                            $(window).scrollTop(scrollTop + (newScrollHeight - $(document).height()));
+                        }
+
+                        if (currentSort.column) {
+                            sortTable(currentSort.column, currentSort.order);
+                        }
+                    }
+                }).always(function () {
+                    $("#loading").hide();
+                    isLoading = false;
+                });
+            }
+
+            let scrollTimeout;
+            $(window).on("scroll", function () {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(function () {
+                    let scrollTop = $(window).scrollTop();
+                    let windowHeight = $(window).height();
+                    let documentHeight = $(document).height();
+
+                    if (scrollTop + windowHeight >= documentHeight - preloadOffset) {
+                        loadPage(maxPageLoaded + 1, "down");
+                    }
+
+                    if (scrollTop <= preloadOffset && minPageLoaded > 1) {
+                        loadPage(minPageLoaded - 1, "up");
+                    }
+                }, 100);
+            });
+
+            function sortTable(column, order) {
+                let rows = $("#repoBody tr").get();
+
+                rows.sort(function(a, b) {
+                    let keyA, keyB;
+
+                    if (column === "name") {
+                        keyA = $(a).find("td:nth-child(1)").text().toLowerCase();
+                        keyB = $(b).find("td:nth-child(1)").text().toLowerCase();
+                        return order === "asc" ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA);
+                    } else if (column === "stars") {
+                        keyA = parseInt($(a).find("td:nth-child(3)").text());
+                        keyB = parseInt($(b).find("td:nth-child(3)").text());
+                        return order === "asc" ? keyA - keyB : keyB - keyA;
+                    }
+                    return 0;
+                });
+
+                $.each(rows, function(index, row) {
+                    $("#repoBody").append(row);
+                });
+            }
+
+            $("#repoTable th[data-sort]").click(function () {
+                let column = $(this).data("sort");
+
+                if (currentSort.column === column) {
+                    currentSort.order = currentSort.order === "asc" ? "desc" : "asc";
+                } else {
+                    currentSort.column = column;
+                    currentSort.order = "asc"; 
+                }
+
+                sortTable(currentSort.column, currentSort.order);
+            });
+        });
+    </script>
+}

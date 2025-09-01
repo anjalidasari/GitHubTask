@@ -1,0 +1,14 @@
+﻿@model List<GitHubTask.Models.GitHub>
+
+@foreach (var repo in Model)
+{
+    <tr>
+        <td>@repo.Name</td>
+        <td>@repo.Description</td>
+        <td>@repo.Stars</td>
+        <td>
+            <img src="@repo.OwnerAvatar" width="40" height="40" style="border-radius:50%" />
+            @repo.OwnerName
+        </td>
+    </tr>
+}
